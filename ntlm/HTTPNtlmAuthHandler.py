@@ -12,6 +12,8 @@
 # License along with this library.  If not, see <http://www.gnu.org/licenses/> or <http://www.gnu.org/licenses/lgpl.txt>.
 
 import urllib2
+import base64
+import string
 import httplib, socket
 from urllib import addinfourl
 import ntlm
@@ -59,6 +61,7 @@ Verify "normal" operation.
             headers = dict(req.headers)
             headers.update(req.unredirected_hdrs)
             auth = 'NTLM %s' % ntlm.create_NTLM_NEGOTIATE_MESSAGE(user, type1_flags)
+            auth = 'NTLM %s' % asbase64(ntlm.create_NTLM_NEGOTIATE_MESSAGE(user, type1_flags))
             if req.headers.get(self.auth_header, None) == auth:
                 return None
             headers[self.auth_header] = auth
@@ -91,8 +94,8 @@ Verify "normal" operation.
             if m:
                 auth_header_value, = m.groups()
 
-            (ServerChallenge, NegotiateFlags) = ntlm.parse_NTLM_CHALLENGE_MESSAGE(auth_header_value[5:])
-            auth = 'NTLM %s' % ntlm.create_NTLM_AUTHENTICATE_MESSAGE(ServerChallenge, UserName, DomainName, pw, NegotiateFlags)
+            (ServerChallenge, NegotiateFlags) = ntlm.parse_NTLM_CHALLENGE_MESSAGE(base64.decodestring(auth_header_value[5:]))
+            auth = 'NTLM %s' % asbase64(ntlm.create_NTLM_AUTHENTICATE_MESSAGE(ServerChallenge, UserName, DomainName, pw, NegotiateFlags))
             headers[self.auth_header] = auth
             headers["Connection"] = "Close"
             headers = dict((name.title(), val) for name, val in headers.items())
@@ -131,6 +134,8 @@ class ProxyNtlmAuthHandler(AbstractNtlmAuthHandler, urllib2.BaseHandler):
     def http_error_407(self, req, fp, code, msg, headers):
         return self.http_error_authentication_required('proxy-authenticate', req, fp, headers)
 
+def asbase64(msg):
+    return string.replace(base64.encodestring(msg), '\n', '')
 
 if __name__ == "__main__":
     import doctest
